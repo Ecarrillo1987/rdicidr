@@ -20,13 +20,22 @@ jobs:
           node-version: '18'
 
       - name: Instalar dependencias
-        run: npm install --legacy-peer-deps
+        run: |
+          cd codebase/rdicidr-0.1.0
+          npm ci
 
       - name: Lint
-        run: npm run lint
+        run: |
+          cd codebase/rdicidr-0.1.0
+          pwd
+          npm run lint
 
       - name: Test
-        run: npm test -- --watchAll=false
+        run: |
+          cd codebase/rdicidr-0.1.0
+          npm test -- --watchAll=false
 
       - name: Build
-        run: npm run build
+        run: |
+          cd codebase/rdicidr-0.1.0
+          npm run build
