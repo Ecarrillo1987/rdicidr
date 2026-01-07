@@ -24,7 +24,7 @@ jobs:
       ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
       ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
       ECS_CONTAINER_NAME: ${{ secrets.ECS_CONTAINER_NAME }}
-      TASK_DEF_FILE: taskdef.json
+      TASK_DEF_FILE: codebase/rdicidr-0.1.0/taskdef.json
       APP_DIR: codebase/rdicidr-0.1.0
 
     steps:
@@ -40,13 +40,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
-      # --- Opción B: OIDC Role (si la usas, comenta el bloque de Access Keys y descomenta este) ---
-      # - name: Configure AWS credentials (OIDC)
-      #   uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-      #     aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
