@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: fsl-frontend
-  namespace: fsl-challenge
+  namespace: production
 spec:
   clusterIP: None
   selector:
@@ -16,10 +16,10 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: fsl-frontend
-  namespace: fsl-challenge
+  namespace: production
 spec:
   serviceName: fsl-frontend
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: fsl-frontend
