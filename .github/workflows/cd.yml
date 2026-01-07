@@ -1,0 +1,93 @@
+name: CD - Deploy to ECS (Fargate)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write   # solo útil si usas OIDC (si usas Access Keys, no estorba)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+      ECS_CONTAINER_NAME: ${{ secrets.ECS_CONTAINER_NAME }}
+      TASK_DEF_FILE: taskdef.json
+      APP_DIR: codebase/rdicidr-0.1.0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ===== Auth (elige SOLO uno de los dos bloques) =====
+
+      # --- Opción A: Access Keys ---
+      - name: Configure AWS credentials (Access Keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # --- Opción B: OIDC Role (si la usas, comenta el bloque de Access Keys y descomenta este) ---
+      # - name: Configure AWS credentials (OIDC)
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      #     aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image to ECR
+        id: build-image
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -euo pipefail
+
+          SHORT_SHA="${GITHUB_SHA::7}"
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          IMAGE_URI_SHA="${REGISTRY}/${ECR_REPOSITORY}:${SHORT_SHA}"
+          IMAGE_URI_STABLE="${REGISTRY}/${ECR_REPOSITORY}:1.0"
+
+          echo "Building ${IMAGE_URI_SHA}"
+          docker build -t "${IMAGE_URI_SHA}" .
+
+          echo "Tagging stable ${IMAGE_URI_STABLE}"
+          docker tag "${IMAGE_URI_SHA}" "${IMAGE_URI_STABLE}"
+
+          echo "Pushing ${IMAGE_URI_SHA}"
+          docker push "${IMAGE_URI_SHA}"
+
+          echo "Pushing ${IMAGE_URI_STABLE}"
+          docker push "${IMAGE_URI_STABLE}"
+
+          echo "image=${IMAGE_URI_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Render ECS task definition (inject new image)
+        id: render-task
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.TASK_DEF_FILE }}
+          container-name: ${{ env.ECS_CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task.outputs.task-definition }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          service: ${{ env.ECS_SERVICE }}
+          wait-for-service-stability: true

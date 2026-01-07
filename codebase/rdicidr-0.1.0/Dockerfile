@@ -1,21 +1,17 @@
-FROM node:15 as builder
+# Build
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
-WORKDIR
+# Serve
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
 
-COPY
+# Nginx on 8080
+RUN sed -i 's/listen\s\+80;/listen 8080;/' /etc/nginx/conf.d/default.conf
 
-RUN 
-
-COPY
-
-RUN 
-
-FROM
-
-WORKDIR
-
-COPY
-
-RUN 
-
-ENTRYPOINT 
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]
